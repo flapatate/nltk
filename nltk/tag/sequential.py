@@ -1,6 +1,6 @@
 # Natural Language Toolkit: Sequential Backoff Taggers
 #
-# Copyright (C) 2001-2017 NLTK Project
+# Copyright (C) 2001-2016 NLTK Project
 # Author: Edward Loper <edloper@gmail.com>
 #         Steven Bird <stevenbird1@gmail.com> (minor additions)
 #         Tiago Tresoldi <tresoldi@users.sf.net> (original affix tagger)
@@ -18,7 +18,6 @@ consulted instead.  Any SequentialBackoffTagger may serve as a
 backoff tagger for any other SequentialBackoffTagger.
 """
 from __future__ import print_function, unicode_literals
-from abc import abstractmethod
 
 import re
 
@@ -30,9 +29,8 @@ from nltk.tag.api import TaggerI, FeaturesetTaggerI
 
 from nltk import jsontags
 
-
 ######################################################################
-# Abstract Base Classes
+#{ Abstract Base Classes
 ######################################################################
 class SequentialBackoffTagger(TaggerI):
     """
@@ -81,11 +79,9 @@ class SequentialBackoffTagger(TaggerI):
         tag = None
         for tagger in self._taggers:
             tag = tagger.choose_tag(tokens, index, history)
-            if tag is not None:
-                break
+            if tag is not None:  break
         return tag
 
-    @abstractmethod
     def choose_tag(self, tokens, index, history):
         """
         Decide which tag should be used for the specified token, and
@@ -103,6 +99,7 @@ class SequentialBackoffTagger(TaggerI):
         :type history: list(str)
         :param history: A list of the tags for all words before *index*.
         """
+        raise NotImplementedError()
 
 
 @python_2_unicode_compatible
@@ -128,7 +125,6 @@ class ContextTagger(SequentialBackoffTagger):
         SequentialBackoffTagger.__init__(self, backoff)
         self._context_to_tag = (context_to_tag if context_to_tag else {})
 
-    @abstractmethod
     def context(self, tokens, index, history):
         """
         :return: the context that should be used to look up the tag
@@ -136,6 +132,7 @@ class ContextTagger(SequentialBackoffTagger):
             should not be handled by this tagger.
         :rtype: (hashable)
         """
+        raise NotImplementedError()
 
     def choose_tag(self, tokens, index, history):
         context = self.context(tokens, index, history)
@@ -183,13 +180,11 @@ class ContextTagger(SequentialBackoffTagger):
                 # Record the event.
                 token_count += 1
                 context = self.context(tokens, index, tags[:index])
-                if context is None:
-                    continue
+                if context is None: continue
                 fd[context][tag] += 1
                 # If the backoff got it wrong, this context is useful:
                 if (self.backoff is None or
-                        tag != self.backoff.tag_one(
-                        tokens, index, tags[:index])):
+                    tag != self.backoff.tag_one(tokens, index, tags[:index])):
                     useful_contexts.add(context)
 
         # Build the context_to_tag table -- for each context, figure
@@ -197,24 +192,41 @@ class ContextTagger(SequentialBackoffTagger):
         # we've seen at least `cutoff` times.
         for context in useful_contexts:
             best_tag = fd[context].max()
-            hits = fd[context][best_tag]
-            if hits > cutoff:
-                self._context_to_tag[context] = best_tag
-                hit_count += hits
+   #         hits = fd[context][best_tag]
+
+            #hack#gets rid of the arbitrary choice between equals
+            
+            bt = 0
+            for c in fd[context]:
+                if fd[context][c] == fd[context][best_tag]:
+                    bt = bt + 1
+                      
+            if bt==1:
+                hits = fd[context][best_tag]
+                if hits > cutoff:
+                    self._context_to_tag[context] = best_tag
+                    hit_count += hits
+               
+
+            #hack#
+
+     #       if hits > cutoff:
+     #           self._context_to_tag[context] = best_tag
+     #           hit_count += hits
 
         # Display some stats, if requested.
         if verbose:
             size = len(self._context_to_tag)
-            backoff = 100 - (hit_count * 100.0) / token_count
+            backoff = 100 - (hit_count * 100.0)/ token_count
             pruning = 100 - (size * 100.0) / len(fd.conditions())
             print("[Trained Unigram tagger:", end=' ')
             print("size=%d, backoff=%.2f%%, pruning=%.2f%%]" % (
                 size, backoff, pruning))
 
+######################################################################
+#{ Tagger Classes
+######################################################################
 
-######################################################################
-# Tagger Classes
-######################################################################
 @python_2_unicode_compatible
 @jsontags.register_tag
 class DefaultTagger(SequentialBackoffTagger):
@@ -300,7 +312,7 @@ class NgramTagger(ContextTagger):
         return cls(_n, model=_context_to_tag, backoff=backoff)
 
     def context(self, tokens, index, history):
-        tag_context = tuple(history[max(0, index-self._n+1):index])
+        tag_context = tuple(history[max(0,index-self._n+1):index])
         return tag_context, tokens[index]
 
 
@@ -656,8 +668,8 @@ class ClassifierBasedTagger(SequentialBackoffTagger, FeaturesetTaggerI):
             untagged_sentence, tags = zip(*sentence)
             for index in range(len(sentence)):
                 featureset = self.feature_detector(untagged_sentence,
-                                                   index, history)
-                classifier_corpus.append((featureset, tags[index]))
+                                                    index, history)
+                classifier_corpus.append( (featureset, tags[index]) )
                 history.append(tags[index])
 
         if verbose:
@@ -687,7 +699,6 @@ class ClassifierBasedTagger(SequentialBackoffTagger, FeaturesetTaggerI):
         See ``feature_detector()``
         """
         return self._classifier
-
 
 class ClassifierBasedPOSTagger(ClassifierBasedTagger):
     """
@@ -738,3 +749,5 @@ class ClassifierBasedPOSTagger(ClassifierBasedTagger):
             'shape': shape,
             }
         return features
+
+
